@@ -1,7 +1,8 @@
 import logging
 
 from enum import Enum
-from struct import unpack
+
+logger = logging.getLogger(__name__)
 
 class UT1300:
     DEVICE_LOCAL_NAMES = ["R1300SJ", "UT1300 BT"]
@@ -21,6 +22,11 @@ class UT1300:
         UNKNOWN = 3
 
     def __init__(self, device):
+        self.successes = {
+            "cell_voltages": 0,
+            "battery_pack_info": 0,
+            "current_and_temperature": 0
+        }
         self.device = device
 
         self.cell1_voltage = 0.0
@@ -60,15 +66,19 @@ class UT1300:
         is_correct_length = self.accumulated_data[3] + self.PACKET_PREFIX_LENGTH == len(self.accumulated_data)
         if not is_complete_message or not is_correct_length:
             return
-        
-        logging.info("Received complete message: %s", self.accumulated_data)
-        
+                
         if self.accumulated_data[5] == 0x02:
             self.parse_cell_voltages()
+            self.successes["cell_voltages"] += 1
+            logging.debug("%s: Updated cell voltages", self.device.name)
         elif self.accumulated_data[5] == 0x03:
             self.parse_battery_pack_info()
+            self.successes["battery_pack_info"] += 1
+            logging.debug("%s: Updated battery pack info", self.device.name)
         elif self.accumulated_data[5] == 0x04:
             self.parse_current_and_temperature()
+            self.successes["current_and_temperature"] += 1
+            logging.debug("%s: Updated current and temperatures", self.device.name)
 
     def parse_cell_voltages(self):
         self.cell1_voltage = float((self.accumulated_data[9] << 8) + self.accumulated_data[10]) / 1000.0
@@ -100,3 +110,9 @@ class UT1300:
         self.total_voltage = float((self.accumulated_data[47] << 8) + self.accumulated_data[48]) / 100.0
         self.max_cell_voltage = float((self.accumulated_data[49] << 8) + self.accumulated_data[50]) / 1000.0
         self.min_cell_voltage = float((self.accumulated_data[51] << 8) + self.accumulated_data[52]) / 1000.0
+
+    def report_successes(self):
+        logger.info("Success counters:\nCell voltages: %s\nBattery pack info:%s\nCurrent and temperature: %s",
+                    self.successes["cell_voltages"],
+                    self.successes["battery_pack_info"],
+                    self.successes["current_and_temperature"])
