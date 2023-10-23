@@ -30,8 +30,8 @@ async def discover_batteries():
 
     return [UT1300(name, device) for name, device in batteries.items()]
 
-async def parse_response(battery: UT1300, influx: InfluxDBManager, sender: BleakGATTCharacteristic, data: bytearray):
-    fields = battery.parse_data(data)
+async def parse_response(battery: UT1300, influx: InfluxDBManager, _: BleakGATTCharacteristic, data: bytearray):
+    fields = battery.ingest_data(data)
     if fields is not None:
         await influx.write({
             "measurement": "battery",
@@ -39,7 +39,6 @@ async def parse_response(battery: UT1300, influx: InfluxDBManager, sender: Bleak
             "fields": fields,
             "time": int(time.time() * 1e9)
         })
-
 
 async def monitor_and_report(battery, influx):
     logging.info("running monitoring loop...")
@@ -58,7 +57,7 @@ async def monitor_and_report(battery, influx):
 
 async def report_successes(battery):
     while True:
-        await asyncio.sleep(30.0)
+        await asyncio.sleep(300.0)
         battery.report_successes()
 
 async def main():
