@@ -19,14 +19,8 @@ class UT1300:
         UNKNOWN = 3
 
     def __init__(self, name, device):
-        self.successes = {
-            "cell_voltages": 0,
-            "battery_pack_info": 0,
-            "current_and_temperature": 0
-        }
         self.name = name
         self.device = device
-
         self.cell1_voltage = 0.0
         self.cell2_voltage = 0.0
         self.cell3_voltage = 0.0
@@ -48,6 +42,11 @@ class UT1300:
         self.min_cell_voltage = 0.0
 
         self.accumulated_data = bytearray()
+        self.successes = {
+            "cell_voltages": 0,
+            "battery_pack_info": 0,
+            "current_and_temperature": 0
+        }
 
     def ingest_data(self, data):
         if self._is_start_of_message(data):
@@ -61,10 +60,13 @@ class UT1300:
         return self._parse_message()
 
     def report_successes(self):
-        logging.info("Success counters:\nCell voltages: %s\nBattery pack info:%s\nCurrent and temperature: %s",
-                    self.successes["cell_voltages"],
-                    self.successes["battery_pack_info"],
-                    self.successes["current_and_temperature"])
+        logging.info("Success counters:\n:"
+                     "Cell voltages: %s\n"
+                     "Battery pack info:%s\n"
+                     "Current and temperature: %s",
+                     self.successes["cell_voltages"],
+                     self.successes["battery_pack_info"],
+                     self.successes["current_and_temperature"])
 
     def _is_start_of_message(self, data):
         start_byte_1 = 0xea
@@ -77,23 +79,22 @@ class UT1300:
                 self._is_complete_message() and
                 self._is_correct_length):
             return False
-        
+
         return True
-    
+
     def _is_message_min_length(self):
         return len(self.accumulated_data) >= 8
-    
+
     def _is_complete_message(self):
         end_byte = 0xf5
 
         return self.accumulated_data[-1] == end_byte
-    
+
     def _is_correct_length(self):
-        length_byte_index = 3
         packet_prefix_length = 4
 
-        return self.accumulated_data[length_byte_index] + packet_prefix_length == len(self.accumulated_data)
-    
+        return self.accumulated_data[3] + packet_prefix_length == len(self.accumulated_data)
+
     def _parse_message(self):
         if self.accumulated_data[5] == 0x02:
             return self._parse_cell_voltages()
@@ -103,10 +104,14 @@ class UT1300:
             return self._parse_battery_pack_info()
 
     def _parse_cell_voltages(self):
-        self.cell1_voltage = float((self.accumulated_data[9] << 8) + self.accumulated_data[10]) / 1000.0
-        self.cell2_voltage = float((self.accumulated_data[11] << 8) + self.accumulated_data[12]) / 1000.0
-        self.cell3_voltage = float((self.accumulated_data[13] << 8) + self.accumulated_data[14]) / 1000.0
-        self.cell4_voltage = float((self.accumulated_data[15] << 8) + self.accumulated_data[16]) / 1000.0
+        self.cell1_voltage = float(
+            (self.accumulated_data[9] << 8) + self.accumulated_data[10]) / 1000.0
+        self.cell2_voltage = float(
+            (self.accumulated_data[11] << 8) + self.accumulated_data[12]) / 1000.0
+        self.cell3_voltage = float(
+            (self.accumulated_data[13] << 8) + self.accumulated_data[14]) / 1000.0
+        self.cell4_voltage = float(
+            (self.accumulated_data[15] << 8) + self.accumulated_data[16]) / 1000.0
 
         self.successes["cell_voltages"] += 1
         self.accumulated_data = bytearray()
@@ -119,7 +124,8 @@ class UT1300:
         }
 
     def _parse_current_and_temperature(self):
-        self.current = float((self.accumulated_data[7] << 8) + self.accumulated_data[8]) / 100.0
+        self.current = float(
+            (self.accumulated_data[7] << 8) + self.accumulated_data[8]) / 100.0
 
         if self.accumulated_data[6] == 0x31:
             self.battery_state = UT1300.State.DISCHARGING
@@ -148,13 +154,20 @@ class UT1300:
     def _parse_battery_pack_info(self):
         self.cycle_count = self.accumulated_data[6]
         self.state_of_charge = self.accumulated_data[7]
-        self.full_capacity = float((0x01 << 16) + (self.accumulated_data[21] << 8) + self.accumulated_data[22]) / 1000.0
-        self.remaining_capacity = float((self.accumulated_data[27] << 8) + self.accumulated_data[28]) / 1000.0
-        self.discharge_time_left = float((self.accumulated_data[30] << 8) + self.accumulated_data[31])
-        self.charge_time_left = float((self.accumulated_data[33] << 8) + self.accumulated_data[34])
-        self.total_voltage = float((self.accumulated_data[47] << 8) + self.accumulated_data[48]) / 100.0
-        self.max_cell_voltage = float((self.accumulated_data[49] << 8) + self.accumulated_data[50]) / 1000.0
-        self.min_cell_voltage = float((self.accumulated_data[51] << 8) + self.accumulated_data[52]) / 1000.0
+        self.full_capacity = float(
+            (0x01 << 16) + (self.accumulated_data[21] << 8) + self.accumulated_data[22]) / 1000.0
+        self.remaining_capacity = float(
+            (self.accumulated_data[27] << 8) + self.accumulated_data[28]) / 1000.0
+        self.discharge_time_left = float(
+            (self.accumulated_data[30] << 8) + self.accumulated_data[31])
+        self.charge_time_left = float(
+            (self.accumulated_data[33] << 8) + self.accumulated_data[34])
+        self.total_voltage = float(
+            (self.accumulated_data[47] << 8) + self.accumulated_data[48]) / 100.0
+        self.max_cell_voltage = float(
+            (self.accumulated_data[49] << 8) + self.accumulated_data[50]) / 1000.0
+        self.min_cell_voltage = float(
+            (self.accumulated_data[51] << 8) + self.accumulated_data[52]) / 1000.0
 
         self.successes["battery_pack_info"] += 1
         self.accumulated_data = bytearray()
