@@ -1,5 +1,6 @@
 import logging
 from enum import Enum
+from bleak.backends.device import BLEDevice
 
 
 class UT1300:
@@ -18,7 +19,7 @@ class UT1300:
         DISCHARGING = 2
         UNKNOWN = 3
 
-    def __init__(self, name, device):
+    def __init__(self, name: str, device: BLEDevice) -> None:
         self.name = name
         self.device = device
         self.cell1_voltage = 0.0
@@ -48,7 +49,7 @@ class UT1300:
             "current_and_temperature": 0
         }
 
-    def ingest_data(self, data):
+    def ingest_data(self, data: bytearray) -> dict | None:
         if self._is_start_of_message(data):
             self.accumulated_data = data
         elif self.accumulated_data:
@@ -59,51 +60,53 @@ class UT1300:
 
         return self._parse_message()
 
-    def report_successes(self):
-        logging.info("Success counters:\n:"
+    def report_successes(self) -> None:
+        logging.info("Success counters:\n"
                      "Cell voltages: %s\n"
-                     "Battery pack info:%s\n"
+                     "Battery pack info: %s\n"
                      "Current and temperature: %s",
                      self.successes["cell_voltages"],
                      self.successes["battery_pack_info"],
                      self.successes["current_and_temperature"])
 
-    def _is_start_of_message(self, data):
+    def _is_start_of_message(self, data: bytearray) -> bool:
         start_byte_1 = 0xea
         start_byte_2 = 0xd1
 
         return len(data) > 2 and data[0] == start_byte_1 and data[1] == start_byte_2
 
-    def _is_valid_message(self):
+    def _is_valid_message(self) -> bool:
         if not (self._is_message_min_length() and
                 self._is_complete_message() and
-                self._is_correct_length):
+                self._is_correct_length()):
             return False
 
         return True
 
-    def _is_message_min_length(self):
+    def _is_message_min_length(self) -> bool:
         return len(self.accumulated_data) >= 8
 
-    def _is_complete_message(self):
+    def _is_complete_message(self) -> bool:
         end_byte = 0xf5
 
         return self.accumulated_data[-1] == end_byte
 
-    def _is_correct_length(self):
+    def _is_correct_length(self) -> bool:
         packet_prefix_length = 4
 
         return self.accumulated_data[3] + packet_prefix_length == len(self.accumulated_data)
 
-    def _parse_message(self):
+    def _parse_message(self) -> dict:
         if self.accumulated_data[5] == 0x02:
             return self._parse_cell_voltages()
-        elif self.accumulated_data[5] == 0x03:
+
+        if self.accumulated_data[5] == 0x03:
             return self._parse_current_and_temperature()
-        elif self.accumulated_data[5] == 0x04:
+
+        if self.accumulated_data[5] == 0x04:
             return self._parse_battery_pack_info()
 
-    def _parse_cell_voltages(self):
+    def _parse_cell_voltages(self) -> dict:
         self.cell1_voltage = float(
             (self.accumulated_data[9] << 8) + self.accumulated_data[10]) / 1000.0
         self.cell2_voltage = float(
@@ -123,7 +126,7 @@ class UT1300:
             "cell4_voltage": self.cell4_voltage
         }
 
-    def _parse_current_and_temperature(self):
+    def _parse_current_and_temperature(self) -> dict:
         self.current = float(
             (self.accumulated_data[7] << 8) + self.accumulated_data[8]) / 100.0
 
@@ -151,7 +154,7 @@ class UT1300:
             "ambient_temperature": self.ambient_temperature
         }
 
-    def _parse_battery_pack_info(self):
+    def _parse_battery_pack_info(self) -> dict:
         self.cycle_count = self.accumulated_data[6]
         self.state_of_charge = self.accumulated_data[7]
         self.full_capacity = float(
